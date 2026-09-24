@@ -1,6 +1,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+#include "app.h"
 #include "perlin_noise.h"
 #include "texture_presets.h"
 
@@ -84,11 +85,5 @@ int main(int argc, char** argv) {
     if (argc >= 3 && std::strcmp(argv[1], "--export") == 0) {
         return run_export(argv[2]);
     }
-
-    std::fprintf(stderr,
-        "Headless preview export only in this build.\n"
-        "Usage: %s --export <output-dir>\n"
-        "(Interactive window mode lands in the next milestone.)\n",
-        argv[0]);
-    return 1;
+    return run_interactive_app();
 }
