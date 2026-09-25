@@ -57,10 +57,21 @@ bool build_ui(mu_Context* ctx, NoiseParams& params) {
     mu_label(ctx, "");
 
     static const Preset kPresets[] = {Preset::Clouds, Preset::Marble, Preset::Fire, Preset::Terrain};
+    mu_Color base_button = ctx->style->colors[MU_COLOR_BUTTON];
+    mu_Color base_hover = ctx->style->colors[MU_COLOR_BUTTONHOVER];
     for (Preset p : kPresets) {
+        bool active = (p == params.preset);
+        if (active) {
+            ctx->style->colors[MU_COLOR_BUTTON] = mu_color(66, 133, 199, 255);
+            ctx->style->colors[MU_COLOR_BUTTONHOVER] = mu_color(84, 151, 217, 255);
+        }
         if (mu_button(ctx, preset_name(p)) && params.preset != p) {
             params.preset = p;
             changed = true;
+        }
+        if (active) {
+            ctx->style->colors[MU_COLOR_BUTTON] = base_button;
+            ctx->style->colors[MU_COLOR_BUTTONHOVER] = base_hover;
         }
     }
 

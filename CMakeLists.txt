@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(FetchContent)
+find_package(Threads REQUIRED)
 
 # --- stb_image_write (single header, used for the headless PNG preview export) ---
 FetchContent_Declare(
@@ -64,4 +65,4 @@ target_include_directories(perlin_noise PRIVATE
     ${microui_SOURCE_DIR}/src
     ${minifb_SOURCE_DIR}/include
 )
-target_link_libraries(perlin_noise PRIVATE microui_lib minifb)
+target_link_libraries(perlin_noise PRIVATE microui_lib minifb Threads::Threads)

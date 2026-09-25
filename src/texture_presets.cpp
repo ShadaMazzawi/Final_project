@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <thread>
 
 namespace {
 
@@ -24,9 +25,8 @@ uint32_t pack_rgb(RGB c) {
            (static_cast<uint32_t>(c.g) << 8) | static_cast<uint32_t>(c.b);
 }
 
-// Fractal noise output is roughly [-1, 1] in theory, but in practice the
-// amplitude-normalized fBm sum rarely exceeds about +-0.5, so a gain is
-// applied here to actually use the full [0, 1] shading range.
+// Fractal noise output rarely spans the full [-1, 1] range in practice, so a
+// contrast gain is applied before remapping to [0, 1] for shading.
 float normalize(float n) {
     constexpr float kContrastGain = 2.0f;
     return std::clamp(n * kContrastGain * 0.5f + 0.5f, 0.0f, 1.0f);
@@ -105,11 +105,11 @@ const char* preset_name(Preset preset) {
     return "Unknown";
 }
 
-void generate_texture(std::vector<uint32_t>& pixels, int width, int height,
-                       const PerlinNoise& noise, const NoiseParams& params) {
-    pixels.resize(static_cast<size_t>(width) * height);
+namespace {
 
-    for (int y = 0; y < height; ++y) {
+void render_rows(std::vector<uint32_t>& pixels, int width, int height, int y_start, int y_end,
+                  const PerlinNoise& noise, const NoiseParams& params) {
+    for (int y = y_start; y < y_end; ++y) {
         float ny = (static_cast<float>(y) / height) * params.scale;
         for (int x = 0; x < width; ++x) {
             float nx = (static_cast<float>(x) / width) * params.scale;
@@ -125,4 +125,31 @@ void generate_texture(std::vector<uint32_t>& pixels, int width, int height,
             pixels[static_cast<size_t>(y) * width + x] = pack_rgb(color);
         }
     }
+}
+
+}  // namespace
+
+void generate_texture(std::vector<uint32_t>& pixels, int width, int height,
+                       const PerlinNoise& noise, const NoiseParams& params) {
+    pixels.resize(static_cast<size_t>(width) * height);
+
+    // Each row is independent, so split the rows across hardware threads to
+    // keep regeneration fast enough to feel live while dragging a slider.
+    unsigned int thread_count = std::min(std::max(1u, std::thread::hardware_concurrency()),
+                                          static_cast<unsigned int>(height));
+    if (thread_count <= 1) {
+        render_rows(pixels, width, height, 0, height, noise, params);
+        return;
+    }
+
+    std::vector<std::thread> workers;
+    int rows_per_thread = (height + static_cast<int>(thread_count) - 1) / static_cast<int>(thread_count);
+    for (unsigned int t = 0; t < thread_count; ++t) {
+        int y_start = static_cast<int>(t) * rows_per_thread;
+        int y_end = std::min(height, y_start + rows_per_thread);
+        if (y_start >= y_end) break;
+        workers.emplace_back(render_rows, std::ref(pixels), width, height, y_start, y_end,
+                              std::cref(noise), std::cref(params));
+    }
+    for (auto& w : workers) w.join();
 }
